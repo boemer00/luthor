@@ -28,6 +28,7 @@ jupyter_client==8.6.2
 jupyter_core==5.7.2
 jupyter_server==2.14.2
 jupyterlab==4.2.4
+nltk==3.8.1
 lxml==5.2.2
 MarkupSafe==2.1.5
 matplotlib-inline==0.1.7
