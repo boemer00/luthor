@@ -4,7 +4,6 @@ from typing import List, Tuple
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
-from transformers import LongformerTokenizer
 
 # Ensure nltk resources are downloaded during setup or first run
 def setup_nltk():
@@ -12,10 +11,10 @@ def setup_nltk():
     nltk.download('punkt', quiet=True)
     nltk.download('wordnet', quiet=True)
 
-class LegalTextPreprocessor:
+class FileTextPreprocessor:
     def __init__(self, tokenizer, chunk_size=4096, overlap=0):
         """
-        Initialize the LegalTextPreprocessor with a tokenizer and configuration for chunking.
+        Initialize the FileTextPreprocessor with a tokenizer and configuration for chunking.
 
         Args:
             tokenizer (object): The tokenizer object to encode and decode text.
