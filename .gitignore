@@ -4,3 +4,5 @@
 *.pyc
 *.log
 .ipynb_checkpoints
+.pdf
+.csv
