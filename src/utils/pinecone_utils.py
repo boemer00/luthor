@@ -1,7 +1,8 @@
 import os
-from pinecone import Pinecone, ServerlessSpec
-from dotenv import load_dotenv
 from typing import List
+
+from dotenv import load_dotenv
+from pinecone import Pinecone, ServerlessSpec
 
 load_dotenv()
 
@@ -23,6 +24,18 @@ if index_name not in client.list_indexes().names():
 index = client.Index(index_name)
 
 def upsert_chunks(chunks: List[str], get_embedding_func):
+    """
+    Upserts text chunks into a Pinecone index by converting each chunk into embeddings.
+
+    Args:
+        chunks (List[str]): A list of text chunks to be upserted into the index.
+        get_embedding_func (callable): A function that generates embeddings from a text string.
+            This function will be imported from `openai_utils` in the `main.py` file.
+
+    This function processes each text chunk using `get_embedding_func` to obtain its
+    corresponding embedding. It then creates vectors that are upserted into a Pinecone index,
+    where each vector includes metadata about the original text and its source.
+    """
     chunk_embeddings = [get_embedding_func(chunk) for chunk in chunks]
 
     vectors = [
@@ -37,6 +50,16 @@ def upsert_chunks(chunks: List[str], get_embedding_func):
     index.upsert(vectors=vectors)
     print(f"Successfully upserted {len(vectors)} vectors to index {index_name}.")
 
-def query_pinecone(query_vector: list, top_k: int = 3):
+def query_pinecone(query_vector: list, top_k: int=3):
+    """
+    Retrieves the top-k most similar vectors from the Pinecone index based on the query vector.
+
+    Args:
+        query_vector (list): The vector to query against the index.
+        top_k (int, optional): The number of similar vectors to return. Defaults to 3.
+
+    Returns:
+        list: A list of the top-k similar vectors with their metadata.
+    """
     response = index.query(vector=query_vector, top_k=top_k, include_values=True, include_metadata=True)
     return response['matches']
