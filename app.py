@@ -1,25 +1,61 @@
 import streamlit as st
 import requests
 
-st.title('Luthor: Chat with your data.')
+# FastAPI server URL
+API_URL = "http://localhost:8000"
 
-# Form to accept user queries
-form = st.form(key='query_form')
-question = form.text_input(label='Hi, how can I help you?')
-submit_button = form.form_submit_button(label='Submit')
+def main():
+    st.title("Luthor: Chat with Your Data")
 
-if submit_button:
-    if question:
-        # Sending POST request to FastAPI
-        response = requests.post(
-            "http://localhost:8000/query",
-            json={"question": question}
-        )
-        if response.status_code == 200:
-            # Display the answer
-            answer = response.json().get('answer', 'No response')
-            st.write(f"Answer: {answer}")
+    # Section for uploading a file
+    st.header("Upload a Document")
+    uploaded_file = st.file_uploader("Choose a file", type=["txt", "pdf", "docx"])
+
+    if uploaded_file is not None:
+        # Display file details
+        st.write("Filename:", uploaded_file.name)
+        st.write("File type:", uploaded_file.type)
+
+        # Button to process the uploaded file
+        if st.button("Process File"):
+            process_file(uploaded_file)
+
+    # Section for asking questions
+    st.header("Ask a Question")
+    question = st.text_input("Enter your question here")
+
+    if st.button("Get Answer"):
+        if question:
+            get_answer(question)
         else:
-            st.write("Failed to get an answer from the server.")
-    else:
-        st.write("Please enter a question.")
+            st.error("Please enter a question.")
+
+def process_file(file):
+    try:
+        # Send file to the FastAPI server for processing
+        files = {"file": (file.name, file, file.type)}
+        response = requests.post(f"{API_URL}/upload", files=files)
+
+        if response.status_code == 200:
+            st.success("File processed and stored successfully!")
+        else:
+            st.error(f"Failed to process file: {response.text}")
+    except Exception as e:
+        st.error(f"Error occurred: {e}")
+
+def get_answer(question):
+    try:
+        # Send the question to the FastAPI server
+        data = {"question": question}
+        response = requests.post(f"{API_URL}/query", json=data)
+
+        if response.status_code == 200:
+            answer = response.json().get("answer", "No answer found.")
+            st.success(f"Answer: {answer}")
+        else:
+            st.error(f"Failed to get answer: {response.text}")
+    except Exception as e:
+        st.error(f"Error occurred: {e}")
+
+if __name__ == "__main__":
+    main()
