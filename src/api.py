@@ -50,7 +50,6 @@ async def upload_file(file: UploadFile = File(...)):
         # Generate embeddings and upsert into Pinecone
         upsert_chunks(chunks, get_embedding)
 
-        print(f"Processed a chunk like this: {chunks[:1]} and stored {len(chunks)} chunks from the uploaded file.")
         return JSONResponse(content={"message": "File processed and stored successfully"}, status_code=200)
 
     except Exception as e:
@@ -61,7 +60,7 @@ async def query_database(query_request: QueryRequest):
     try:
         question = query_request.question
 
-        # Get query embedding
+        # Get query embedding using OpenAI's model
         query_embedding = get_embedding(question)
 
         # Query Pinecone
