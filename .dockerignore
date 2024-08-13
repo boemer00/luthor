@@ -1,0 +1,25 @@
+# Exclude virtual environments
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Editor and IDE configurations
+.vscode/
+.idea/
+
+# Version control
+.git
+.gitignore
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Environment files
+.env
+
+# Node modules (if applicable)
+node_modules/
