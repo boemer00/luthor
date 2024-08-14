@@ -1,78 +1,61 @@
-# import streamlit as st
-# import requests
-
-# # FastAPI server URL
-# API_URL = "http://localhost:8000"
-
-# def main():
-#     st.title("Luthor: Chat with Your Data")
-
-#     # Section for uploading a file
-#     st.header("Upload a Document")
-#     uploaded_file = st.file_uploader("Choose a file", type=["txt", "pdf", "docx"])
-
-#     if uploaded_file is not None:
-#         # Display file details
-#         st.write("Filename:", uploaded_file.name)
-#         st.write("File type:", uploaded_file.type)
-
-#         # Button to process the uploaded file
-#         if st.button("Process File"):
-#             process_file(uploaded_file)
-
-#     # Section for asking questions
-#     st.header("Ask a Question")
-#     question = st.text_input("Enter your question here")
-
-#     if st.button("Get Answer"):
-#         if question:
-#             get_answer(question)
-#         else:
-#             st.error("Please enter a question.")
-
-# def process_file(file):
-#     try:
-#         # Send file to the FastAPI server for processing
-#         files = {"file": (file.name, file, file.type)}
-#         response = requests.post(f"{API_URL}/upload", files=files)
-
-#         if response.status_code == 200:
-#             st.success("File processed and stored successfully!")
-#         else:
-#             st.error(f"Failed to process file: {response.text}")
-#     except Exception as e:
-#         st.error(f"Error occurred: {e}")
-
-# def get_answer(question):
-#     try:
-#         # Send the question to the FastAPI server
-#         data = {"question": question}
-#         response = requests.post(f"{API_URL}/query", json=data)
-
-#         if response.status_code == 200:
-#             answer = response.json().get("answer", "No answer found.")
-#             st.success(f"Answer: {answer}")
-#         else:
-#             st.error(f"Failed to get answer: {response.text}")
-#     except Exception as e:
-#         st.error(f"Error occurred: {e}")
-
-# if __name__ == "__main__":
-#     main()
-
-
 import streamlit as st
-import numpy as np
+from io import BytesIO
+from transformers import LongformerTokenizer
 
-# Title
-st.title("Luthor: Test App")
+from src.data_loader import read_file
+from src.preprocessor import FileTextPreprocessor, setup_nltk
+from src.utils.openai_utils import generate_answer, get_embedding
+from src.utils.pinecone_utils import query_pinecone, upsert_chunks
 
-# Text Input
-name = st.text_input("Enter your name:")
+# Setup NLTK
+setup_nltk()
 
-# Display a message based on input
-if name:
-    st.write(f"Hello, {name}!")
+# Initialise tokenizer
+tokenizer = LongformerTokenizer.from_pretrained("allenai/longformer-base-4096")
 
-# Additional example text
-st.write("Streamlit is working correctly if you can interact with the text input.")
+# Initialise preprocessor
+preprocessor = FileTextPreprocessor(tokenizer)
+
+# Streamlit interface
+st.title("Luthor Interface - v0")
+
+uploaded_file = st.file_uploader("Upload a document", type=["txt", "pdf", "docx"])
+
+if uploaded_file is not None:
+    try:
+        # Convert the uploaded file to BytesIO and pass it along with the filename
+        file_content = BytesIO(uploaded_file.read())
+        text = read_file(file_content, uploaded_file.name)
+
+        # Preprocess the document
+        chunks = preprocessor.preprocess_doc(text)
+
+        # Generate embeddings and upsert into Pinecone
+        upsert_chunks(chunks, get_embedding)
+
+        st.success("File processed and stored successfully!")
+
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+
+query = st.text_input("Enter your query")
+
+if query:
+    try:
+        # Get query embedding using OpenAI's model
+        query_embedding = get_embedding(query)
+
+        # Query Pinecone
+        matches = query_pinecone(query_embedding)
+
+        # Extract context from matches
+        # context = " ".join(match['metadata']['text'] for match in matches)
+        context = " ".join(" ".join(match['metadata']['text']) if isinstance(match['metadata']['text'], list) else match['metadata']['text'] for match in matches)
+
+        # Generate answer
+        answer = generate_answer(query, context)
+
+        st.write("Answer:", answer)
+
+    except Exception as e:
+        st.error(f"An error occurred: {e}")

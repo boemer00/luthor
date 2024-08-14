@@ -62,5 +62,5 @@ def query_pinecone(query_vector: list, top_k: int=3):
         list: A list of the top-k similar vectors with their metadata.
     """
     response = index.query(vector=query_vector, top_k=top_k, include_values=True, include_metadata=True)
-    print(f"Query successful. Found {response['matches']} matches.")
+    print(f"Query successful. Found {len(response['matches'])} matches.")
     return response['matches']
