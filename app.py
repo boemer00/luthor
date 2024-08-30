@@ -118,7 +118,8 @@ def process_query(query, date_range, doc_type, legal_area):
             context = []
             for match in matches:
                 text = match['metadata'].get('text', '')
-                citation = f"[{match['metadata'].get('doc_type', 'Document')} - {match['metadata'].get('id', 'Unknown ID')}]"
+                file_name = match['metadata'].get('file_name', 'Unknown File')
+                citation = f"[Source: {file_name}]"
                 context.append(f"{text} {citation}")
 
             context_text = " ".join(context)
@@ -129,8 +130,9 @@ def process_query(query, date_range, doc_type, legal_area):
         st.write(answer)
 
         st.subheader("Sources:")
-        for source in context:
-            st.write(source)
+        unique_sources = set(match['metadata'].get('file_name', 'Unknown File') for match in matches)
+        for source in unique_sources:
+            st.write(f"- {source}")
 
         logging.info(f"Query processed: {query}")
 
