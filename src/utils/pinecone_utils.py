@@ -23,44 +23,36 @@ if index_name not in client.list_indexes().names():
 # Retrieve the index
 index = client.Index(index_name)
 
-def upsert_chunks(chunks: List[str], get_embedding_func):
+def upsert_chunks(vectors: List[dict]):
     """
-    Upserts text chunks into a Pinecone index by converting each chunk into embeddings.
+    Upserts vectors into the Pinecone index.
 
     Args:
-        chunks (List[str]): A list of text chunks to be upserted into the index.
-        get_embedding_func (callable): A function that generates embeddings from a text string.
-            This function will be imported from `openai_utils` in the `main.py` file.
-
-    This function processes each text chunk using `get_embedding_func` to obtain its
-    corresponding embedding. It then creates vectors that are upserted into a Pinecone index,
-    where each vector includes metadata about the original text and its source.
+        vectors (List[dict]): A list of dictionaries, each containing 'id', 'values', and 'metadata'.
     """
-    chunk_embeddings = [get_embedding_func(chunk) for chunk in chunks]
+    try:
+        index.upsert(vectors=vectors)
+        print(f"Successfully upserted {len(vectors)} vectors to index {index_name}.")
+    except Exception as e:
+        print(f"Error upserting chunks to Pinecone: {str(e)}")
+        raise
 
-    vectors = [
-        {
-            "id": f"doc_{i}",
-            "values": chunk_embeddings[i],
-            "metadata": {"text": chunks[i], "source": "database"}
-        }
-        for i in range(len(chunks))
-    ]
-
-    index.upsert(vectors=vectors)
-    print(f"Successfully upserted {len(vectors)} vectors to index {index_name}.")
-
-def query_pinecone(query_vector: list, top_k: int=3):
+def query_pinecone(query_vector: list, filters: dict = None, top_k: int = 5):
     """
     Retrieves the top-k most similar vectors from the Pinecone index based on the query vector.
 
     Args:
         query_vector (list): The vector to query against the index.
-        top_k (int, optional): The number of similar vectors to return. Defaults to 3.
+        filters (dict, optional): Metadata filters to apply to the query. Defaults to None.
+        top_k (int, optional): The number of similar vectors to return. Defaults to 5.
 
     Returns:
         list: A list of the top-k similar vectors with their metadata.
     """
-    response = index.query(vector=query_vector, top_k=top_k, include_values=True, include_metadata=True)
-    print(f"Query successful. Found {len(response['matches'])} matches.")
-    return response['matches']
+    try:
+        response = index.query(vector=query_vector, filter=filters, top_k=top_k, include_values=True, include_metadata=True)
+        print(f"Query successful. Found {len(response['matches'])} matches.")
+        return response['matches']
+    except Exception as e:
+        print(f"Error querying Pinecone: {str(e)}")
+        raise
