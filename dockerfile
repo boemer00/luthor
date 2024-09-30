@@ -17,4 +17,5 @@ EXPOSE 8000
 EXPOSE 8501
 
 # Run FastAPI on container start
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
