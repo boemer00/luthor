@@ -6,7 +6,6 @@ import hashlib
 import matplotlib.pyplot as plt
 import time
 from wordcloud import WordCloud
-from collections import Counter
 
 from src.data_loader import read_file
 from src.preprocessor import FileTextPreprocessor, setup_nltk
@@ -14,7 +13,7 @@ from src.utils.openai_utils import generate_answer, get_embedding
 from src.utils.pinecone_utils import query_pinecone, upsert_chunks
 from src.utils.exceptions import DuplicateDocumentError, DatabaseConnectionError, InvalidQueryError
 
-st.set_page_config(page_title='Luthor Interface', page_icon='🤖', layout='wide')
+st.set_page_config(page_title='Luthor - Chat with your work', page_icon='🤖', layout='wide')
 
 # Setup NLTK
 setup_nltk()
@@ -26,7 +25,7 @@ def load_models():
 models = load_models()
 tokenizer = models['tokenizer']
 
-# Initialize preprocessor
+# Initialise preprocessor
 preprocessor = FileTextPreprocessor(tokenizer)
 
 def setup_logging():
@@ -37,19 +36,8 @@ def get_file_hash(file_content):
     return hashlib.md5(file_content.getvalue()).hexdigest()
 
 @st.cache_data
-def generate_document_type_chart(uploaded_files):
-    doc_types = [file.name.split('.')[-1] for file in uploaded_files]
-    type_counts = Counter(doc_types)
-    fig, ax = plt.subplots()
-    ax.bar(type_counts.keys(), type_counts.values())
-    ax.set_xlabel('Document Type')
-    ax.set_ylabel('Count')
-    ax.set_title('Document Types Uploaded')
-    return fig
-
-@st.cache_data
 def generate_word_cloud(text):
-    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text)
+    wordcloud = WordCloud(width=600, height=300, background_color='white', colormap='binary').generate(text)
     fig, ax = plt.subplots()
     ax.imshow(wordcloud, interpolation='bilinear')
     ax.axis('off')
@@ -75,13 +63,9 @@ def main():
     uploaded_files = st.file_uploader('Upload documents', type=['txt', 'pdf', 'docx'], accept_multiple_files=True)
 
     if uploaded_files:
-        st.subheader('Document Type Distribution')
-        st.pyplot(generate_document_type_chart(uploaded_files))
-
         for uploaded_file in uploaded_files:
             process_uploaded_file(uploaded_file)
 
-        # Generate and display word cloud
         all_text = ' '.join([read_file(file, file.name) for file in uploaded_files])
         st.subheader('Word Cloud of Uploaded Documents')
         st.pyplot(generate_word_cloud(all_text))
@@ -102,6 +86,7 @@ def process_uploaded_file(uploaded_file):
     try:
         with st.spinner('Processing file...'):
             file_content = BytesIO(uploaded_file.read())
+            file_content.seek(0)
             file_hash = get_file_hash(file_content)
 
             if check_duplicate_document(file_hash):
