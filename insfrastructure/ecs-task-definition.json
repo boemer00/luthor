@@ -1,0 +1,44 @@
+{
+  "family": "luthor-app",
+  "networkMode": "awsvpc",
+  "containerDefinitions": [
+    {
+      "name": "luthor-app",
+      "image": "<your-ecr-repo-url>:latest",
+      "portMappings": [
+        {
+          "containerPort": 8501,
+          "hostPort": 8501,
+          "protocol": "tcp"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "OPENAI_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:region:account-id:secret:openai-api-key"
+        },
+        {
+          "name": "PINECONE_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:region:account-id:secret:pinecone-api-key"
+        },
+        {
+          "name": "PINECONE_ENVIRONMENT",
+          "valueFrom": "arn:aws:secretsmanager:region:account-id:secret:pinecone-environment"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/luthor-app",
+          "awslogs-region": "us-west-2",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ],
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "256",
+  "memory": "512"
+}
