@@ -96,10 +96,9 @@ Access the Luthor application through the Application Load Balancer's DNS name.
 
 - Currently, the system doesn't handle document deduplication effectively.
 - The search refinement options (date range, document type, legal area) are not fully implemented in the backend.
-- Error handling and logging could be improved for better debugging and user feedback.
 - The system could benefit from more advanced NLP techniques for better understanding of legal context.
-- Consider implementing auto-scaling for the ECS service based on traffic patterns.
-- Implement a CI/CD pipeline for automated deployments.
+- Potential auto-scaling for the ECS service based on traffic patterns.
+- CI/CD pipeline updates for improved automated deployments.
 
 ## License
 
