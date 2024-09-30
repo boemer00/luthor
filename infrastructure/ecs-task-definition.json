@@ -4,7 +4,7 @@
   "containerDefinitions": [
     {
       "name": "luthor-app",
-      "image": "<your-ecr-repo-url>:latest",
+      "image": "590183873000.dkr.ecr.eu-west-2.amazonaws.com/luthor-app:latest",
       "portMappings": [
         {
           "containerPort": 8501,
@@ -40,5 +40,6 @@
     "FARGATE"
   ],
   "cpu": "256",
-  "memory": "512"
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::590183873000:role/ecsTaskExecutionRole"
 }
