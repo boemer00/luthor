@@ -8,6 +8,7 @@ from src.data_loader import read_file
 from src.preprocessor import FileTextPreprocessor, setup_nltk
 from src.utils.openai_utils import generate_answer, get_embedding
 from src.utils.pinecone_utils import query_pinecone, upsert_chunks
+from src.utils.exceptions import DuplicateDocumentError, DatabaseConnectionError, InvalidQueryError
 
 # Setup NLTK
 setup_nltk()
@@ -39,7 +40,7 @@ def main():
         process_uploaded_file(uploaded_file)
 
     query = st.text_input("Enter your query")
-    
+
     # Search refinement options
     st.sidebar.header("Search Refinement")
     date_range = st.sidebar.date_input("Date Range", [])
@@ -56,92 +57,99 @@ def process_uploaded_file(uploaded_file):
             file_hash = get_file_hash(file_content)
 
             if check_duplicate_document(file_hash):
-                st.warning("This document has already been uploaded and stored.")
-                logging.info(f"Duplicate document upload attempt: {uploaded_file.name}")
-                return
+                raise DuplicateDocumentError("This document has already been uploaded and stored.")
 
             text = read_file(file_content, uploaded_file.name)
             _, segments, _, _, _, chunks = preprocessor.preprocess_doc(text)
-            
-            # Create vectors for each chunk
-            vectors = []
-            for i, chunk in enumerate(chunks):
-                chunk_embedding = get_embedding(chunk)
-                vector = {
-                    "id": f"{file_hash}_{i}",
-                    "values": chunk_embedding,
-                    "metadata": {
-                        "file_hash": file_hash,
-                        "file_name": uploaded_file.name,
-                        "chunk_id": str(i),
-                        "text": chunk[:1000]  # Limit text to 1000 characters
-                    }
-                }
-                vectors.append(vector)
-            
-            # Upsert vectors to Pinecone
+
+            vectors = create_vectors(chunks, file_hash, uploaded_file.name)
+
             upsert_chunks(vectors)
 
         st.success("File processed and stored successfully!")
         logging.info(f"File uploaded and processed: {uploaded_file.name}")
 
+    except DuplicateDocumentError as e:
+        st.warning(str(e))
+        logging.info(f"Duplicate document upload attempt: {uploaded_file.name}")
     except Exception as e:
         st.error(f"An unexpected error occurred while processing the file: {str(e)}")
         logging.exception(f"Unexpected error processing file: {uploaded_file.name}")
 
+def create_vectors(chunks, file_hash, file_name):
+    vectors = []
+    for i, chunk in enumerate(chunks):
+        chunk_embedding = get_embedding(chunk)
+        vector = {
+            "id": f"{file_hash}_{i}",
+            "values": chunk_embedding,
+            "metadata": {
+                "file_hash": file_hash,
+                "file_name": file_name,
+                "chunk_id": str(i),
+                "text": chunk[:1000]  # Limit text to 1000 characters
+            }
+        }
+        vectors.append(vector)
+    return vectors
+
 def check_duplicate_document(file_hash):
-    # Implement this function to check if the document already exists in your database
+    # Implement this function to check if the document already exists
     # Return True if it's a duplicate, False otherwise
-    # For now, we'll return False as a placeholder
+    # Return False as a placeholder
     return False
 
 def process_query(query, date_range, doc_type, legal_area):
     if not query.strip():
-        st.warning("Please enter a valid query.")
-        return
+        raise InvalidQueryError("Please enter a valid query.")
 
     try:
         with st.spinner("Generating answer..."):
             query_embedding = get_embedding(query)
-            
-            # Apply search refinements
-            filters = {}
-            if date_range:
-                filters["date"] = {"$gte": date_range[0], "$lte": date_range[1]}
-            if doc_type:
-                filters["doc_type"] = {"$in": doc_type}
-            if legal_area:
-                filters["legal_area"] = legal_area
 
+            filters = create_filters(date_range, doc_type, legal_area)
             matches = query_pinecone(query_embedding, filters=filters)
 
-            context = []
-            for match in matches:
-                text = match['metadata'].get('text', '')
-                file_name = match['metadata'].get('file_name', 'Unknown File')
-                citation = f"[Source: {file_name}]"
-                context.append(f"{text} {citation}")
+            context = create_context(matches)
+            answer = generate_answer(query, context)
 
-            context_text = " ".join(context)
-
-            answer = generate_answer(query, context_text)
-
-        st.subheader("Answer:")
-        st.write(answer)
-
-        st.subheader("Sources:")
-        unique_sources = set(match['metadata'].get('file_name', 'Unknown File') for match in matches)
-        for source in unique_sources:
-            st.write(f"- {source}")
-
+        display_results(answer, matches)
         logging.info(f"Query processed: {query}")
 
-    except ConnectionError:
+    except DatabaseConnectionError:
         st.error("Error: Unable to connect to the database. Please try again later.")
         logging.error("Database connection error during query processing")
     except Exception as e:
         st.error(f"An unexpected error occurred while processing your query: {str(e)}")
         logging.exception(f"Unexpected error processing query: {query}")
+
+def create_filters(date_range, doc_type, legal_area):
+    filters = {}
+    if date_range:
+        filters["date"] = {"$gte": date_range[0], "$lte": date_range[1]}
+    if doc_type:
+        filters["doc_type"] = {"$in": doc_type}
+    if legal_area:
+        filters["legal_area"] = legal_area
+    return filters
+
+def create_context(matches):
+    context = []
+    for match in matches:
+        text = match['metadata'].get('text', '')
+        file_name = match['metadata'].get('file_name', 'Unknown File')
+        citation = f"[Source: {file_name}]"
+        context.append(f"{text} {citation}")
+    return " ".join(context)
+
+def display_results(answer, matches):
+    st.subheader("Answer:")
+    st.write(answer)
+
+    st.subheader("Sources:")
+    unique_sources = set(match['metadata'].get('file_name', 'Unknown File') for match in matches)
+    for source in unique_sources:
+        st.write(f"- {source}")
 
 if __name__ == "__main__":
     main()

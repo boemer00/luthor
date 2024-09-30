@@ -1,28 +1,39 @@
 import os
+import logging
 from typing import List
 
 from dotenv import load_dotenv
 from pinecone import Pinecone, ServerlessSpec
+from tenacity import retry, stop_after_attempt, wait_random_exponential
 
 load_dotenv()
 
-# Initialise Pinecone client
-pinecone_api_key = os.getenv('PINECONE_API_KEY')
-index_name = 'luthor-test-nb-0'
-client = Pinecone(api_key=pinecone_api_key)
+# Initialize logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Ensure the index is created
-if index_name not in client.list_indexes().names():
-    client.create_index(
-        name=index_name,
-        dimension=1536,
-        metric='cosine',
-        spec=ServerlessSpec(cloud='aws', region='us-east-1')
-    )
+# Initialize Pinecone client
+try:
+    pinecone_api_key = os.getenv('PINECONE_API_KEY')
+    index_name = 'luthor-test-nb-0'
+    client = Pinecone(api_key=pinecone_api_key)
 
-# Retrieve the index
-index = client.Index(index_name)
+    # Ensure the index is created
+    if index_name not in client.list_indexes().names():
+        client.create_index(
+            name=index_name,
+            dimension=1536,
+            metric='cosine',
+            spec=ServerlessSpec(cloud='aws', region='us-east-1')
+        )
 
+    # Retrieve the index
+    index = client.Index(index_name)
+except Exception as e:
+    logger.error(f"Failed to initialize Pinecone client: {str(e)}")
+    raise
+
+@retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(3))
 def upsert_chunks(vectors: List[dict]):
     """
     Upserts vectors into the Pinecone index.
@@ -32,11 +43,12 @@ def upsert_chunks(vectors: List[dict]):
     """
     try:
         index.upsert(vectors=vectors)
-        print(f"Successfully upserted {len(vectors)} vectors to index {index_name}.")
+        logger.info(f"Successfully upserted {len(vectors)} vectors to index {index_name}.")
     except Exception as e:
-        print(f"Error upserting chunks to Pinecone: {str(e)}")
+        logger.error(f"Error upserting chunks to Pinecone: {str(e)}")
         raise
 
+@retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(3))
 def query_pinecone(query_vector: list, filters: dict = None, top_k: int = 5):
     """
     Retrieves the top-k most similar vectors from the Pinecone index based on the query vector.
@@ -51,8 +63,8 @@ def query_pinecone(query_vector: list, filters: dict = None, top_k: int = 5):
     """
     try:
         response = index.query(vector=query_vector, filter=filters, top_k=top_k, include_values=True, include_metadata=True)
-        print(f"Query successful. Found {len(response['matches'])} matches.")
+        logger.info(f"Query successful. Found {len(response['matches'])} matches.")
         return response['matches']
     except Exception as e:
-        print(f"Error querying Pinecone: {str(e)}")
+        logger.error(f"Error querying Pinecone: {str(e)}")
         raise

@@ -1,30 +1,38 @@
 import os
-
+import logging
 from dotenv import load_dotenv
 import openai
 from openai import OpenAI
+from tenacity import retry, stop_after_attempt, wait_random_exponential
 
 load_dotenv()
 
-# Initialise OpenAI client
-client = OpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY"),
-)
+# Initialize logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
+# Initialize OpenAI client
+try:
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+except Exception as e:
+    logger.error(f"Failed to initialize OpenAI client: {str(e)}")
+    raise
 
+@retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(3))
 def get_embedding(text: str, model: str="text-embedding-3-small"):
-    response = openai.embeddings.create(input=text, model=model)
-    return response.data[0].embedding
+    try:
+        response = openai.embeddings.create(input=text, model=model)
+        return response.data[0].embedding
+    except Exception as e:
+        logger.error(f"Error in get_embedding: {str(e)}")
+        raise
 
+@retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(3))
 def generate_answer(question: str, context: str, model: str='gpt-4o-mini'):
     if not context.strip():
-        return "I don't know."
+        return "I don't have enough information to answer this question."
 
-    # Identify context source
-    if "database" in context:
-        context_source = "from the database"
-    else:
-        context_source = "from llm knowledge"
+    context_source = "from the database" if "database" in context else "from llm knowledge"
 
     prompt = f"""You are an experienced lawyer specializing in extracting and interpreting information from legal
     documents, past memos, and other records to answer questions accurately. Your goal is to provide the most
@@ -41,20 +49,19 @@ def generate_answer(question: str, context: str, model: str='gpt-4o-mini'):
     - If unable to answer, state 'I don't know,' but also indicate why (e.g., insufficient context, unclear question).
     """
 
-    # Construct the message prompt for the chat completion
     messages = [
         {"role": "system", "content": "You are an experienced lawyer specializing in extracting and interpreting information from legal documents to provide accurate advice."},
         {"role": "user", "content": prompt}
     ]
 
-    # Call the chat completions API
-    response = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        max_tokens=250,
-        temperature=0
-    )
-
-    # Extract the assistant's message from the response
-    generated_answer = response.choices[0].message.content.strip()
-    return generated_answer
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_tokens=250,
+            temperature=0
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error(f"Error in generate_answer: {str(e)}")
+        raise
